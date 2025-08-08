@@ -56,8 +56,9 @@ jobs:
         env:
           ELIFE_USERNAME: ${{ secrets.ELIFE_USERNAME }}
           ELIFE_PASSWORD: ${{ secrets.ELIFE_PASSWORD }}
-          GMAIL_ADDR: ${{ secrets.GMAIL_ADDR }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
         run: |
           set -e
           mkdir -p artifacts
