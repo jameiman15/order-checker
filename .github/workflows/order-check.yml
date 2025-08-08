@@ -61,7 +61,7 @@ jobs:
         run: |
           set -e
           mkdir -p artifacts
-          SCRIPT="requests_auto_order_check.py"   # ←←← 這行改成你的檔名
+          SCRIPT="order_check.py"   # ←←← 這行改成你的檔名
           echo "Running $SCRIPT ..."
           python "$SCRIPT"
 
