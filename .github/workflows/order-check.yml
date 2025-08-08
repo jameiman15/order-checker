@@ -1,30 +1,75 @@
 name: 全國電子訂單檢查系統
 
 on:
+  workflow_dispatch: {}
   schedule:
-    - cron: '0 1 * * *'   # 每天台灣時間 9:00 (UTC 01:00)
-    - cron: '0 7 * * *'   # 每天台灣時間 15:00 (UTC 07:00)
-  workflow_dispatch:
+    # 每天台灣時間 09:05 執行（UTC+8 = 01:05 UTC）
+    - cron: "5 1 * * *"
 
 jobs:
   order-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-    - name: 📥 檢出程式碼
-      uses: actions/checkout@v4
-    - name: 🐍 設定 Python 環境
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-    - name: 📦 安裝相依套件
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    - name: 🚀 執行訂單檢查
-      env:
-        ELIFE_USERNAME: ${{ secrets.ELIFE_USERNAME }}
-        ELIFE_PASSWORD: ${{ secrets.ELIFE_PASSWORD }}
-        GMAIL_USER: ${{ secrets.GMAIL_USER }}
-        GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
-        RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
-      run: python order_check.py
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 🛰️ 這兩步就是你要的「出口 IP」與「目標站可達性」檢查
+      - name: Check outbound IP
+        run: |
+          echo "Outbound IP:"
+          (curl -s https://ifconfig.me || curl -s http://ifconfig.me) || true
+
+      - name: Probe vendor login page
+        run: |
+          set -e
+          echo "Probing https://www.elifemall.com.tw/vendor/ ..."
+          curl -I -L --max-time 20 'https://www.elifemall.com.tw/vendor/' || true
+
+      # ✅ 確認 Secrets 至少有值（不會顯示內容，只印長度）
+      - name: Sanity check secrets (masked)
+        run: |
+          echo "USER_LEN=${#ELIFE_USERNAME}"
+          echo "PASS_LEN=${#ELIFE_PASSWORD}"
+          echo "GMAIL_ADDR_LEN=${#GMAIL_ADDR}"
+          echo "GMAIL_APP_PW_LEN=${#GMAIL_APP_PASSWORD}"
+        env:
+          ELIFE_USERNAME: ${{ secrets.ELIFE_USERNAME }}
+          ELIFE_PASSWORD: ${{ secrets.ELIFE_PASSWORD }}
+          GMAIL_ADDR: ${{ secrets.GMAIL_ADDR }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # ▶️ 執行你的檢查程式
+      #   把 SCRIPT 改成你 repo 內實際的 .py 檔（例：requests_auto_order_check.py）
+      - name: Run order checker
+        env:
+          ELIFE_USERNAME: ${{ secrets.ELIFE_USERNAME }}
+          ELIFE_PASSWORD: ${{ secrets.ELIFE_PASSWORD }}
+          GMAIL_ADDR: ${{ secrets.GMAIL_ADDR }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          set -e
+          mkdir -p artifacts
+          SCRIPT="requests_auto_order_check.py"   # ←←← 這行改成你的檔名
+          echo "Running $SCRIPT ..."
+          python "$SCRIPT"
+
+      # ⤴️ 失敗時把 artifacts（例如你程式存的 login 截圖/HTML）上傳，方便排錯
+      - name: Upload debug artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-artifacts
+          path: artifacts/**
+          if-no-files-found: ignore
