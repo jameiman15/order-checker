@@ -1,4 +1,4 @@
-name: 全國電子訂單檢查系統
+name: 全國電子訂單檢查系統 v3.0
 
 on:
   workflow_dispatch: {}
@@ -15,7 +15,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 檢查出口 IP
       - name: Check outbound IP
         run: |
           echo "Outbound IP:"
@@ -27,7 +26,6 @@ jobs:
           echo "Probing https://www.elifemall.com.tw/vendor/ ..."
           curl -I -L --max-time 20 'https://www.elifemall.com.tw/vendor/' || true
 
-      # ✅ 修正：統一環境變數名稱
       - name: Sanity check secrets (masked)
         run: |
           echo "ELIFE_USERNAME_LEN=${#ELIFE_USERNAME}"
@@ -52,8 +50,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 urllib3
 
-      # ▶️ 執行檢查程式
-      - name: Run order checker
+      # ▶️ 執行詳細除錯版本
+      - name: Run order checker (detailed debug)
         env:
           ELIFE_USERNAME: ${{ secrets.ELIFE_USERNAME }}
           ELIFE_PASSWORD: ${{ secrets.ELIFE_PASSWORD }}
@@ -61,16 +59,16 @@ jobs:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
         run: |
-          set -e
           mkdir -p artifacts
-          echo "Running order_check.py ..."
-          python order_check.py
+          echo "Running order_check_always_debug.py ..."
+          python order_check_always_debug.py
+        continue-on-error: true  # 即使失敗也繼續執行
 
-      # 失敗時上傳 debug 檔案
-      - name: Upload debug artifacts
-        if: failure()
+      # 🔍 無論成功失敗都上傳 artifacts
+      - name: Upload debug artifacts (ALWAYS)
         uses: actions/upload-artifact@v4
+        if: always()  # 關鍵：無論成功失敗都執行
         with:
-          name: debug-artifacts
+          name: debug-artifacts-detailed
           path: artifacts/**
-          if-no-files-found: ignore
+          if-no-files-found: warn
